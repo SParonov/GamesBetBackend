@@ -1,0 +1,6 @@
+{
+    "ConnectionString": "server=localhost;password=123456;encrypt=disable;database=GamesBet;",
+    "Port": 8081,
+    "Url": "http://localhost",
+    "CORSAllowedOrigins": ["localhost", "127.0.0.1", "http://localhost:3000"]
+}
