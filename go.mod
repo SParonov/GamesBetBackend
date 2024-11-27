@@ -5,7 +5,13 @@ go 1.22.2
 require github.com/denisenkom/go-mssqldb v0.12.3
 
 require (
+	filippo.io/edwards25519 v1.1.0 // indirect
+	github.com/AfterShip/email-verifier v1.4.1 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
+	github.com/go-sql-driver/mysql v1.8.1 // indirect
+	github.com/hbollon/go-edlib v1.6.0 // indirect
+	golang.org/x/net v0.31.0 // indirect
+	golang.org/x/text v0.20.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
@@ -14,5 +20,5 @@ require (
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
 	github.com/rs/cors v1.11.1
 	github.com/tkanos/gonfig v0.0.0-20210106201359-53e13348de2f
-	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d // indirect
+	golang.org/x/crypto v0.29.0 // indirect
 )

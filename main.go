@@ -7,8 +7,10 @@ import (
 	"log"
 	"net/http"
 
-	_ "github.com/denisenkom/go-mssqldb"
+	"math/rand"
+	_ "github.com/go-sql-driver/mysql"
 	cors "github.com/sparonov/GamesBetBackend/cors"
+	emailverifier "github.com/AfterShip/email-verifier"
 	"github.com/tkanos/gonfig"
 )
 
@@ -27,6 +29,8 @@ type user struct {
 }
 
 func signupHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	var Id int32
+	Id=rand.Int31()
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPut {
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
@@ -46,17 +50,31 @@ func signupHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Different password added on confirm password", http.StatusBadRequest)
 			return
 		}
-
-		query := `USE GamesBet
-				INSERT INTO Users (Username, Email, Password)
-				VALUES 	(@p1, @p2, @p3)`
-
-		err = db.QueryRow(query, user.Username, user.Email, user.Password).Err()
+		verifier:=emailverifier.NewVerifier()
+		res, _:= verifier.Verify(user.Email)
+		if !res.Syntax.Valid{
+			http.Error(w, "Invalid email syntax", http.StatusBadRequest)
+			return
+		}
+		//guarantee the id is unique
+		checkForDublicateId:="SELECT * FROM UserData.UserRegisterInfo WHERE Id=?;"
+		row:=db.QueryRow(checkForDublicateId, Id)
+		err=row.Scan(&Id)
+		for err!=sql.ErrNoRows{
+			Id=rand.Int31()
+			row=db.QueryRow(checkForDublicateId, Id)
+			err=row.Scan(&Id)
+		}
+		var insertStatement *sql.Stmt
+	
+		insertStatement, err= db.Prepare("INSERT INTO UserRegisterInfo (Id, Username, Email, Password) VALUES (?, ?, ?, ?);")
 
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		defer insertStatement.Close()
+		insertStatement.Exec(Id, user.Username, user.Email, user.Password)
 
 		fmt.Println("New user registered:")
 		fmt.Printf("Username %v, Password: %v, Email: %v\n", user.Username, user.Password, user.Email)
@@ -74,7 +92,7 @@ func main() {
 		log.Fatalf("cannot read the config file. GetConf returned: %s", err.Error())
 	}
 
-	db, err := sql.Open("sqlserver", config.ConnectionString)
+	db, err := sql.Open("mysql", config.ConnectionString)
 
 	if err != nil {
 		log.Fatalf("cannot open db engine %v", err)

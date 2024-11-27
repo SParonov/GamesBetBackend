@@ -1,5 +1,5 @@
 {
-    "ConnectionString": "server=localhost;password=123456;encrypt=disable;database=GamesBet;",
+    "ConnectionString": "root:gocoursepass@tcp(127.0.0.1:3306)/UserData",
     "Port": 8081,
     "Url": "http://localhost",
     "CORSAllowedOrigins": ["localhost", "127.0.0.1", "http://localhost:3000"]
