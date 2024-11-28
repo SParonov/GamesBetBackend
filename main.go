@@ -84,6 +84,31 @@ func signupHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func loginHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request){
+	return func(w http.ResponseWriter, r *http.Request){
+		if r.Method != http.MethodPut {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var user user
+
+		err := json.NewDecoder(r.Body).Decode(&user)
+
+		if err != nil {
+			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+			return
+		}
+		checkIfAnAccountExists:="SELECT * FROM UserData.UserRegisterInfo WHERE Email=? AND Password=?;"
+		row:=db.QueryRow(checkIfAnAccountExists, user.Email, user.Password)
+		err=row.Scan(&user.Email)
+		if err==sql.ErrNoRows{
+			http.Error(w, "Invalid email and password combination", http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		}
+}
 func main() {
 	config := configuration{}
 	err := gonfig.GetConf("config.json", &config)
@@ -99,6 +124,8 @@ func main() {
 	}
 
 	http.HandleFunc("/signup", cors.CORSMiddleware(config.CORSAllowedOrigins, signupHandler(db)))
+	http.HandleFunc("/login", cors.CORSMiddleware(config.CORSAllowedOrigins, loginHandler(db)))
+
 
 	log.Printf("started listening on port %d\n", config.Port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil))
