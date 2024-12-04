@@ -12,6 +12,8 @@ import (
 	cors "github.com/sparonov/GamesBetBackend/cors"
 	emailverifier "github.com/AfterShip/email-verifier"
 	"github.com/tkanos/gonfig"
+	"github.com/gorilla/sessions"
+	"github.com/gorilla/context"
 )
 
 type configuration struct {
@@ -22,12 +24,14 @@ type configuration struct {
 }
 
 type user struct {
+	Id				int32		
 	Username        string `json:"username"`
 	Password        string `json:"password"`
 	PasswordConfirm string `json:"passwordConfirm"`
 	Email           string `json:"email"`
 }
 
+var store =sessions.NewCookieStore([]byte("session-key"))
 func signupHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
 	var Id int32
 	Id=rand.Int31()
@@ -101,10 +105,16 @@ func loginHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request){
 		}
 		checkIfAnAccountExists:="SELECT * FROM UserData.UserRegisterInfo WHERE Email=? AND Password=?;"
 		row:=db.QueryRow(checkIfAnAccountExists, user.Email, user.Password)
-		err=row.Scan(&user.Email)
+		err=row.Scan(&user)
 		if err==sql.ErrNoRows{
 			http.Error(w, "Invalid email and password combination", http.StatusBadRequest)
 			return
+		}
+		session, _:=store.Get(r, "session") 
+		session.Values["userEmail"]=user.Email
+		err=session.Save(r, w)
+		if err!=nil{
+			fmt.Print(err)
 		}
 		w.WriteHeader(http.StatusOK)
 		}
@@ -128,7 +138,7 @@ func main() {
 
 
 	log.Printf("started listening on port %d\n", config.Port)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", config.Port), context.ClearHandler(http.DefaultServeMux)))
 
 	defer db.Close()
 }

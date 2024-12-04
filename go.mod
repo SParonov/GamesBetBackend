@@ -1,6 +1,8 @@
 module github.com/sparonov/GamesBetBackend
 
-go 1.22.2
+go 1.23
+
+toolchain go1.23.2
 
 require github.com/denisenkom/go-mssqldb v0.12.3
 
@@ -9,6 +11,9 @@ require (
 	github.com/AfterShip/email-verifier v1.4.1 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
+	github.com/gorilla/context v1.1.2 // indirect
+	github.com/gorilla/securecookie v1.1.2 // indirect
+	github.com/gorilla/sessions v1.4.0 // indirect
 	github.com/hbollon/go-edlib v1.6.0 // indirect
 	golang.org/x/net v0.31.0 // indirect
 	golang.org/x/text v0.20.0 // indirect
