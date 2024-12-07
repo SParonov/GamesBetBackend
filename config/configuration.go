@@ -1,7 +1,8 @@
 package config
 
-import(
+import (
 	"log"
+
 	"github.com/tkanos/gonfig"
 )
 
@@ -12,7 +13,7 @@ type configuration struct {
 	CORSAllowedOrigins []string
 }
 
-func Config() configuration{
+func Config() configuration {
 	config := configuration{}
 	err := gonfig.GetConf("config/config.json", &config)
 
