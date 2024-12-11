@@ -101,13 +101,16 @@ func LoginHandler(db *sql.DB, sessionManager *sessionmanager.SessionManager) fun
 			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 			return
 		}
-		checkIfAnAccountExists := "SELECT * FROM UserData.UserRegisterInfo WHERE Email=? AND Password=?;"
-		err = db.QueryRow(checkIfAnAccountExists, user.Email, user.Password).Err()
-
-		if err != nil {
+		checkIfAnAccountExists := "SELECT * FROM Userdata.userRegisterInfo WHERE Email=? AND Password=?;"
+		row := db.QueryRow(checkIfAnAccountExists, user.Email, user.Password)
+		err = row.Scan(&user)
+		if err == sql.ErrNoRows {
 			http.Error(w, "Invalid email and password combination", http.StatusBadRequest)
 			return
 		}
+
+		fmt.Println("User logged:")
+		fmt.Printf("Email: %v, Password: %v\n", user.Email, user.Password)
 
 		ctx := context.Background()
 		sessionID, err := sessionManager.CreateSession(ctx, user.Email)
