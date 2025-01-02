@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/rand"
 	"net/http"
 
@@ -101,6 +102,7 @@ func LoginHandler(db *sql.DB, sessionManager *sessionmanager.SessionManager) fun
 			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 			return
 		}
+
 		checkIfAnAccountExists := "SELECT * FROM Userdata.userRegisterInfo WHERE Email=? AND Password=?;"
 		row := db.QueryRow(checkIfAnAccountExists, user.Email, user.Password)
 		err = row.Scan(&user)
@@ -131,5 +133,102 @@ func LoginHandler(db *sql.DB, sessionManager *sessionmanager.SessionManager) fun
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(sessionDataJSON))
+	}
+}
+
+type GameData struct {
+	Coins     int32 `json:"coins"`
+	Highscore int32 `json:"highscore"`
+}
+
+func UpdateUserGameDataHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		defer r.Body.Close()
+
+		gameHigscore := r.PathValue("gameID") + "_Highscore"
+		userEmail := r.PathValue("userEmail")
+
+		getPrevCoinsAndHighscore := fmt.Sprintf("SELECT Coins, %s FROM UserGamesInfo WHERE Email=?", gameHigscore)
+
+		var prevCoins int32
+		var prevHighscore int32
+
+		row := db.QueryRow(getPrevCoinsAndHighscore, userEmail)
+		if err := row.Scan(&prevCoins, &prevHighscore); err != nil {
+			if err == sql.ErrNoRows {
+				http.Error(w, "No previous data found for the user", http.StatusNotFound)
+			} else {
+				http.Error(w, "Error retrieving previous game data: "+err.Error(), http.StatusInternalServerError)
+			}
+			return
+		}
+
+		var newGameData GameData
+
+		err := json.NewDecoder(r.Body).Decode(&newGameData)
+
+		if err != nil {
+			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+			return
+		}
+
+		query := fmt.Sprintf("UPDATE UserGamesInfo SET coins=?, %s=? WHERE Email=?", gameHigscore)
+
+		_, err = db.Exec(query, prevCoins+newGameData.Coins, int32(math.Max(float64(prevHighscore), float64(newGameData.Highscore))), userEmail)
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+type HighscoreResponse struct {
+	Highscore int32 `json:"highscore"`
+}
+
+func GetUserGameDataHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		defer r.Body.Close()
+
+		gameHigscore := r.PathValue("gameID") + "_Highscore"
+		userEmail := r.PathValue("userEmail")
+
+		getPrevCoinsAndHighscore := fmt.Sprintf("SELECT %s FROM UserGamesInfo WHERE Email=?", gameHigscore)
+
+		var highscore int32
+
+		row := db.QueryRow(getPrevCoinsAndHighscore, userEmail)
+		if err := row.Scan(&highscore); err != nil {
+			if err == sql.ErrNoRows {
+				http.Error(w, "No previous data found for the user", http.StatusNotFound)
+			} else {
+				http.Error(w, "Error retrieving previous game data: "+err.Error(), http.StatusInternalServerError)
+			}
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		response := HighscoreResponse{
+			Highscore: highscore,
+		}
+
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Error encoding response: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }

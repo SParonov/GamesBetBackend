@@ -23,6 +23,10 @@ func main() {
 
 	http.HandleFunc("/signup", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.SignupHandler(db, sessionManager)))
 	http.HandleFunc("/login", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.LoginHandler(db, sessionManager)))
+	// http.HandleFunc("/getGamesData", ...); returns data from all games from all users (will be used in scoreboard)
+	// http.HandleFunc("/getGamesData/{gameID}", ...); returns data from a game from all users (will be used in scoreboard)
+	http.HandleFunc("/updateGamesData/{gameID}/{userEmail}", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.UpdateUserGameDataHandler(db)))
+	http.HandleFunc("/getGamesData/{gameID}/{userEmail}", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.GetUserGameDataHandler(db)))
 
 	log.Printf("started listening on port %d\n", config.Port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", config.Port), context.ClearHandler(http.DefaultServeMux)))
