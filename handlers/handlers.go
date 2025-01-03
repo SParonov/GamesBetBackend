@@ -58,6 +58,16 @@ func SignupHandler(db *sql.DB, sessionManager *sessionmanager.SessionManager) fu
 		err = db.QueryRow(query, Id, user.Username, user.Email, user.Password).Err()
 
 		if err != nil {
+			fmt.Print(err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		query = "INSERT INTO UserGamesInfo (Email, Coins, Game1_Unlocked, Game1_Highscore, Game2_Unlocked, Game2_Highscore, Game3_Unlocked, Game3_Highscore, Game4_Unlocked, Game4_Highscore, Game5_Unlocked, Game5_Highscore, Game6_Unlocked, Game6_Highscore, Game7_Unlocked, Game7_Highscore, Game8_Unlocked, Game8_Highscore) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+		err = db.QueryRow(query, user.Email, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0).Err()
+
+		if err != nil {
+			fmt.Print(err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -81,6 +91,7 @@ func SignupHandler(db *sql.DB, sessionManager *sessionmanager.SessionManager) fu
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(sessionDataJSON))
