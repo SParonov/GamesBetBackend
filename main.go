@@ -30,6 +30,8 @@ func main() {
 	http.HandleFunc("/getGamesData/{gameID}/{userEmail}", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.GetUserGameDataHandler(db)))
 	http.HandleFunc("/getChatHistory", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.GetChatHistoryHandler(db)))
 	http.HandleFunc("/saveMessToChatHistory", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.SaveMessToChatHistoryHandler(db)))
+	http.HandleFunc("/updateCoins", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.UpdateCoinsHandler(db)))
+	// http.HandleFunc("/getCoins", ...) (will be used in every game to show all coins of the user)
 	http.HandleFunc("/ws", websocket.WebSocketHandler)
 
 	go websocket.HandleMessages()

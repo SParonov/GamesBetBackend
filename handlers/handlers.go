@@ -93,7 +93,6 @@ func SignupHandler(db *sql.DB, sessionManager *sessionmanager.SessionManager) fu
 			return
 		}
 
-
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(sessionDataJSON))
 	}
@@ -319,6 +318,79 @@ func SaveMessToChatHistoryHandler(db *sql.DB) func(w http.ResponseWriter, r *htt
 			return
 		}
 
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+type CoinsQuery struct {
+	Coins int32  `json:"coins"`
+	Email string `json:"email"`
+}
+
+type CoinsQueryResponse struct {
+	Coins       int32
+	EnoughCoins bool
+}
+
+func UpdateCoinsHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var coinsQuery CoinsQuery
+
+		err := json.NewDecoder(r.Body).Decode(&coinsQuery)
+
+		if err != nil {
+			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+			return
+		}
+
+		query := "SELECT Coins FROM UserGamesInfo WHERE Email=?;"
+		row := db.QueryRow(query, coinsQuery.Email)
+
+		var availableCoins int32
+
+		if err := row.Scan(&availableCoins); err != nil {
+			if err == sql.ErrNoRows {
+				http.Error(w, "No previous data found for the user", http.StatusNotFound)
+			} else {
+				http.Error(w, "Error retrieving previous game data: "+err.Error(), http.StatusInternalServerError)
+			}
+			return
+		}
+
+		enoughCoins := true
+		var response CoinsQueryResponse
+
+		if availableCoins < coinsQuery.Coins {
+			enoughCoins = false
+			response = CoinsQueryResponse{
+				EnoughCoins: enoughCoins,
+				Coins:       0,
+			}
+		} else {
+			removeCoinsFromAccount := "UPDATE UserGamesInfo SET Coins=? WHERE Email=?"
+
+			_, err = db.Exec(removeCoinsFromAccount, availableCoins-coinsQuery.Coins, coinsQuery.Email)
+
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			response = CoinsQueryResponse{
+				EnoughCoins: enoughCoins,
+				Coins:       coinsQuery.Coins,
+			}
+		}
+
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Error encoding response: "+err.Error(), http.StatusInternalServerError)
+		}
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 	}
 }
