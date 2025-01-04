@@ -13,6 +13,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/sparonov/GamesBetBackend/sessionmanager"
 	"github.com/sparonov/GamesBetBackend/user"
+	"github.com/sparonov/GamesBetBackend/websocket"
 )
 
 func SignupHandler(db *sql.DB, sessionManager *sessionmanager.SessionManager) func(w http.ResponseWriter, r *http.Request) {
@@ -230,5 +231,83 @@ func GetUserGameDataHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Requ
 			http.Error(w, "Error encoding response: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+	}
+}
+
+type ChatHistoryResponse struct {
+	ChatHistory []websocket.Message
+}
+
+func GetChatHistoryHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		defer r.Body.Close()
+
+		rows, err := db.Query("SELECT id, email, timestamp, text FROM ChatHistory")
+
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		defer rows.Close()
+
+		var message websocket.Message
+
+		messages := []websocket.Message{}
+
+		for rows.Next() {
+			err = rows.Scan(&message.ID, &message.Email, &message.Timestamp, &message.Text)
+
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+
+			messages = append(messages, message)
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		response := ChatHistoryResponse{
+			ChatHistory: messages,
+		}
+
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Error encoding response: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+func SaveMessToChatHistoryHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var message websocket.Message
+
+		err := json.NewDecoder(r.Body).Decode(&message)
+
+		if err != nil {
+			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+			return
+		}
+
+		query := "INSERT INTO ChatHistory (Id, Text, Email, Timestamp) VALUES (?, ?, ?, ?)"
+		err = db.QueryRow(query, message.ID, message.Text, message.Email, message.Timestamp).Err()
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
 	}
 }
