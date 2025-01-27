@@ -32,6 +32,11 @@ func main() {
 	http.HandleFunc("/saveMessToChatHistory", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.SaveMessToChatHistoryHandler(db)))
 	http.HandleFunc("/updateCoins", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.UpdateCoinsHandler(db)))
 	// http.HandleFunc("/getCoins", ...) (will be used in every game to show all coins of the user)
+	http.HandleFunc("/getFriends/{userEmail}", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.GetFriendsHandler(db)))
+	http.HandleFunc("/getPotentialNewFriends/{userEmail}", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.PotentialNewFriendsHandler(db)))
+	http.HandleFunc("/getFriendInvites/{userEmail}", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.GetFriendInvitesHandler(db)))
+	http.HandleFunc("/inviteFriend/{userEmail}/{friendEmail}", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.InviteFriendHandler(db)))
+	http.HandleFunc("/handleInvite/{userEmail}/{friendEmail}/{type}", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.CompleteInviteHandler(db)))
 	http.HandleFunc("/ws", websocket.WebSocketHandler)
 
 	go websocket.HandleMessages()

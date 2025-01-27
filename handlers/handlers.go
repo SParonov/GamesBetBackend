@@ -391,6 +391,302 @@ func UpdateCoinsHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request)
 			http.Error(w, "Error encoding response: "+err.Error(), http.StatusInternalServerError)
 		}
 		w.Header().Set("Content-Type", "application/json")
+	}
+}
+
+func PotentialNewFriendsHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		userEmail := r.PathValue("userEmail")
+
+		query := `
+			SELECT Email
+			FROM UserRegisterInfo
+			LEFT JOIN Friendships f 
+			ON (Email = f.FriendEmail AND f.UserEmail = ?) 
+			WHERE (f.status IS NULL OR f.status = 'declined')
+			AND Email != ?;`
+
+		rows, err := db.Query(query, userEmail, userEmail)
+		if err != nil {
+			http.Error(w, "Failed to execute query: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var potentialFriends []string
+
+		for rows.Next() {
+			var email string
+			if err := rows.Scan(&email); err != nil {
+				http.Error(w, "Error reading data: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			potentialFriends = append(potentialFriends, email)
+		}
+
+		if err := rows.Err(); err != nil {
+			http.Error(w, "Error iterating over rows: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		response := struct {
+			PotentialFriends []string `json:"potentialFriends"`
+		}{
+			PotentialFriends: potentialFriends,
+		}
+
+		responseJSON, err := json.Marshal(response)
+		if err != nil {
+			http.Error(w, "Failed to marshal response: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(responseJSON)
+	}
+}
+
+func InviteFriendHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		userEmail := r.PathValue("userEmail")
+		friendEmail := r.PathValue("friendEmail")
+
+		if userEmail == "" || friendEmail == "" {
+			http.Error(w, "Missing userEmail or friendEmail in the URL", http.StatusBadRequest)
+			return
+		}
+
+		query := `
+			SELECT COUNT(*) 
+			FROM userdata.friendships 
+			WHERE (UserEmail = ? AND FriendEmail = ?) 
+			   OR (UserEmail = ? AND FriendEmail = ?);`
+
+		var count int
+		err := db.QueryRow(query, userEmail, friendEmail, friendEmail, userEmail).Scan(&count)
+		if err != nil {
+			http.Error(w, "Error checking friendship status", http.StatusInternalServerError)
+			return
+		}
+
+		if count > 0 {
+			updateQuery := `
+				UPDATE friendships 
+				SET status = 'pending' 
+				WHERE (UserEmail = ? AND FriendEmail = ?) 
+				   OR (UserEmail = ? AND FriendEmail = ?);`
+
+			_, err := db.Exec(updateQuery, userEmail, friendEmail, friendEmail, userEmail)
+			if err != nil {
+				http.Error(w, "Error updating friendship status", http.StatusInternalServerError)
+				return
+			}
+		} else {
+			insertQuery := `
+				INSERT INTO userdata.friendships (UserEmail, FriendEmail, status)
+				VALUES (?, ?, 'pending');`
+
+			_, err := db.Exec(insertQuery, userEmail, friendEmail)
+			if err != nil {
+				http.Error(w, "Error inserting friendship", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func GetFriendsHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Invalid HTTP method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		userEmail := r.PathValue("userEmail")
+
+		if userEmail == "" {
+			http.Error(w, "Missing userEmail in the URL", http.StatusBadRequest)
+			return
+		}
+
+		query := `
+			SELECT FriendEmail
+			FROM Friendships 
+			WHERE UserEmail = ?
+			AND status = 'accepted';`
+
+		rows, err := db.Query(query, userEmail)
+		if err != nil {
+			http.Error(w, "Error fetching friends", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var friends []string
+
+		for rows.Next() {
+			var friendEmail string
+			if err := rows.Scan(&friendEmail); err != nil {
+				http.Error(w, "Error scanning rows", http.StatusInternalServerError)
+				return
+			}
+			friends = append(friends, friendEmail)
+		}
+
+		if err := rows.Err(); err != nil {
+			http.Error(w, "Error iterating over rows", http.StatusInternalServerError)
+			return
+		}
+
+		response := struct {
+			Friends []string `json:"friends"`
+		}{
+			Friends: friends,
+		}
+
+		responseJSON, err := json.Marshal(response)
+		if err != nil {
+			http.Error(w, "Failed to marshal response: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(responseJSON)
+	}
+}
+
+func GetFriendInvitesHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Invalid HTTP method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		userEmail := r.PathValue("userEmail")
+		if userEmail == "" {
+			http.Error(w, "Missing userEmail in the URL", http.StatusBadRequest)
+			return
+		}
+
+		query := `SELECT UserEmail FROM userdata.Friendships WHERE FriendEmail = ? AND Status = 'pending';`
+		rows, err := db.Query(query, userEmail)
+		if err != nil {
+			http.Error(w, "Error retrieving friend invites", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var invites []string
+		for rows.Next() {
+			var inviterEmail string
+			if err := rows.Scan(&inviterEmail); err != nil {
+				http.Error(w, "Error scanning data", http.StatusInternalServerError)
+				return
+			}
+			invites = append(invites, inviterEmail)
+		}
+
+		if err := rows.Err(); err != nil {
+			http.Error(w, "Error processing rows", http.StatusInternalServerError)
+			return
+		}
+
+		response := struct {
+			Invites []string `json:"invites"`
+		}{
+			Invites: invites,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Error encoding response", http.StatusInternalServerError)
+		}
+	}
+}
+
+func CompleteInviteHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		userEmail := r.PathValue("userEmail")
+		friendEmail := r.PathValue("friendEmail")
+		action := r.PathValue("type")
+
+		var newStatus string
+		if action == "accept" {
+			newStatus = "accepted"
+		} else if action == "decline" {
+			newStatus = "declined"
+		} else {
+			http.Error(w, "Invalid action", http.StatusBadRequest)
+			return
+		}
+
+		updateQuery := `
+			UPDATE Friendships 
+			SET Status = ? 
+			WHERE UserEmail = ? AND FriendEmail = ?
+		`
+		_, err := db.Exec(updateQuery, newStatus, friendEmail, userEmail)
+		if err != nil {
+			http.Error(w, "Error updating friendship status: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		var count int
+		checkQuery := `
+			SELECT COUNT(*) 
+			FROM userdata.Friendships 
+			WHERE UserEmail = ? AND FriendEmail = ?
+		`
+		err = db.QueryRow(checkQuery, userEmail, friendEmail).Scan(&count)
+		if err != nil {
+			http.Error(w, "Error checking second row existence: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if count > 0 {
+			updateQuerySecondRow := `
+				UPDATE userdata.Friendships 
+				SET Status = ? 
+				WHERE UserEmail = ? AND FriendEmail = ?
+			`
+			_, err := db.Exec(updateQuerySecondRow, newStatus, userEmail, friendEmail)
+			if err != nil {
+				http.Error(w, "Error updating second row: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+		} else {
+			insertQuery := `
+				INSERT INTO userdata.Friendships (UserEmail, FriendEmail, Status)
+				VALUES (?, ?, ?)
+			`
+			_, err := db.Exec(insertQuery, userEmail, friendEmail, newStatus)
+			if err != nil {
+				http.Error(w, "Error inserting second row: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+
 		w.WriteHeader(http.StatusOK)
 	}
 }
