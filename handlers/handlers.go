@@ -8,9 +8,11 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
+	"time"
 
 	emailverifier "github.com/AfterShip/email-verifier"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
 	"github.com/sparonov/GamesBetBackend/sessionmanager"
 	"github.com/sparonov/GamesBetBackend/user"
 	"github.com/sparonov/GamesBetBackend/websocket"
@@ -685,6 +687,145 @@ func CompleteInviteHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Reque
 				http.Error(w, "Error inserting second row: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+type ScheduleGameRequest struct {
+	Player1   string `json:"player1"`
+	Player2   string `json:"player2"`
+	StartDate string `json:"startDate"`
+	Game      string `json:"game"`
+}
+
+func ScheduleGameHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		id := uuid.New().String()
+
+		var req ScheduleGameRequest
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			http.Error(w, "Failed to parse request", http.StatusBadRequest)
+			return
+		}
+
+		query := `INSERT INTO scheduler (id, player1, player2, startDate, game) VALUES (?, ?, ?, ?, ?)`
+		_, err = db.Exec(query, id, req.Player1, req.Player2, req.StartDate, req.Game)
+		if err != nil {
+			http.Error(w, "Failed to schedule game", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+type Game struct {
+	ID        string `json:"id"`
+	Player1   string `json:"player1"`
+	Player2   string `json:"player2"`
+	StartDate string `json:"startDate"`
+	Game      string `json:"game"`
+}
+
+func removeScheduledGame(db *sql.DB, gameID string) error {
+	query := `
+		SET SQL_SAFE_UPDATES = 0;
+		DELETE FROM scheduler WHERE id = ?;
+	`
+
+	_, err := db.Exec(query, gameID)
+	return err
+}
+
+func GetScheduledGamesHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		userEmail := r.PathValue("userEmail")
+		if userEmail == "" {
+			http.Error(w, "User email is required", http.StatusBadRequest)
+			return
+		}
+
+		query := `
+			SELECT id, player1, player2, startDate, game 
+			FROM scheduler 
+			WHERE player1 = ? OR player2 = ?`
+
+		rows, err := db.Query(query, userEmail, userEmail)
+		if err != nil {
+			http.Error(w, "Failed to fetch scheduled games", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var games []Game
+
+		for rows.Next() {
+			var game Game
+			err := rows.Scan(&game.ID, &game.Player1, &game.Player2, &game.StartDate, &game.Game)
+			if err != nil {
+				http.Error(w, "Failed to read game data", http.StatusInternalServerError)
+				return
+			}
+
+			gameStartDate, err := time.Parse("2006-01-02T15:04", game.StartDate)
+			if err != nil {
+				http.Error(w, "Invalid date format", http.StatusInternalServerError)
+				return
+			}
+
+			if gameStartDate.Add(24 * time.Hour).Before(time.Now()) {
+				err := removeScheduledGame(db, game.ID)
+				if err != nil {
+					http.Error(w, fmt.Sprintf("Failed to remove expired game: %v", err), http.StatusInternalServerError)
+					return
+				}
+				continue
+			}
+
+			games = append(games, game)
+		}
+
+		if err := rows.Err(); err != nil {
+			http.Error(w, "Error iterating rows", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(struct {
+			ScheduledGames []Game `json:"scheduledGames"`
+		}{ScheduledGames: games}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
+	}
+}
+
+func RemoveScheduledGameHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		gameID := r.PathValue("gameID")
+
+		err := removeScheduledGame(db, gameID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to remove scheduled game: %v", err), http.StatusInternalServerError)
+			return
 		}
 
 		w.WriteHeader(http.StatusOK)
