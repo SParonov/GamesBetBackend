@@ -736,13 +736,19 @@ type Game struct {
 }
 
 func removeScheduledGame(db *sql.DB, gameID string) error {
-	query := `
-		SET SQL_SAFE_UPDATES = 0;
-		DELETE FROM scheduler WHERE id = ?;
-	`
+	_, err := db.Exec("SET SQL_SAFE_UPDATES = 0;")
+	if err != nil {
+		return fmt.Errorf("failed to disable safe updates: %v", err)
+	}
 
-	_, err := db.Exec(query, gameID)
-	return err
+	query := `DELETE FROM scheduler WHERE id = ?;`
+	_, err = db.Exec(query, gameID)
+
+	if err != nil {
+		return fmt.Errorf("failed to remove expired game: %v", err)
+	}
+
+	return nil
 }
 
 func GetScheduledGamesHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
@@ -786,7 +792,11 @@ func GetScheduledGamesHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Re
 				return
 			}
 
-			if gameStartDate.Add(24 * time.Hour).Before(time.Now()) {
+			gameStartDate = gameStartDate.UTC()
+
+			now := time.Now().UTC()
+
+			if gameStartDate.Add(24 * time.Hour).Before(now.Add(2 * time.Hour)) {
 				err := removeScheduledGame(db, game.ID)
 				if err != nil {
 					http.Error(w, fmt.Sprintf("Failed to remove expired game: %v", err), http.StatusInternalServerError)
