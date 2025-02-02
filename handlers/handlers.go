@@ -17,7 +17,8 @@ import (
 	"github.com/sparonov/GamesBetBackend/user"
 	"github.com/sparonov/GamesBetBackend/websocket"
 )
-//login/register
+
+// login/register
 func SignupHandler(db *sql.DB, sessionManager *sessionmanager.SessionManager) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPut {
@@ -245,7 +246,8 @@ func GetUserGameDataHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Requ
 		}
 	}
 }
-//chat handlers
+
+// chat handlers
 type ChatHistoryResponse struct {
 	ChatHistory []websocket.Message
 }
@@ -323,7 +325,8 @@ func SaveMessToChatHistoryHandler(db *sql.DB) func(w http.ResponseWriter, r *htt
 		w.WriteHeader(http.StatusOK)
 	}
 }
-//update coins
+
+// update coins
 type CoinsQuery struct {
 	Coins int32  `json:"coins"`
 	Email string `json:"email"`
@@ -395,7 +398,8 @@ func UpdateCoinsHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request)
 		w.Header().Set("Content-Type", "application/json")
 	}
 }
-//friends handlers
+
+// friends handlers
 func PotentialNewFriendsHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -696,7 +700,8 @@ func CompleteInviteHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Reque
 		w.WriteHeader(http.StatusOK)
 	}
 }
-//scheduler handlers
+
+// scheduler handlers
 type ScheduleGameRequest struct {
 	Player1   string `json:"player1"`
 	Player2   string `json:"player2"`
@@ -846,15 +851,15 @@ func RemoveScheduledGameHandler(db *sql.DB) func(w http.ResponseWriter, r *http.
 	}
 }
 
-type ScoreboardRow struct{
+type ScoreboardRow struct {
 	Email string `json: "email"`
-	Coins int	 `json: "coins"`
+	Coins int    `json: "coins"`
 }
 
-func HandleScoreboard(db *sql.DB) func(w http.ResponseWriter, r *http.Request){
-	return func(w http.ResponseWriter, r *http.Request){
+func HandleScoreboard(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 
-		if(r.Method!=http.MethodGet){
+		if r.Method != http.MethodGet {
 			http.Error(w, "Invalid request method", http.StatusBadRequest)
 		}
 
@@ -876,25 +881,25 @@ func HandleScoreboard(db *sql.DB) func(w http.ResponseWriter, r *http.Request){
 		if err = rows.Err(); err != nil {
 			fmt.Print(err)
 		}
-		
+
 		//sort res in descending order
-		for i:=0;i<len(res);i++{
-			for j:=i;j<len(res);j++{
-				if(res[i].Coins<res[j].Coins){
-					temp:=res[i]
-					res[i]=res[j]
-					res[j]=temp
+		for i := 0; i < len(res); i++ {
+			for j := i; j < len(res); j++ {
+				if res[i].Coins < res[j].Coins {
+					temp := res[i]
+					res[i] = res[j]
+					res[j] = temp
 				}
 			}
 		}
-		
+
 		fmt.Print(res)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 
 		// json.Marshal(struct {
-		// 	scoreboard ScoreboardRow[] 
+		// 	scoreboard ScoreboardRow[]
 		//  }{})
 		if err := json.NewEncoder(w).Encode(struct {
 			Scoreboard []ScoreboardRow `json:"scoreboard"`
@@ -904,52 +909,94 @@ func HandleScoreboard(db *sql.DB) func(w http.ResponseWriter, r *http.Request){
 	}
 }
 
-func HandleBuyGame(db *sql.DB) func(w http.ResponseWriter, r *http.Request){
-	return func(w http.ResponseWriter, r *http.Request){
+func HandleBuyGame(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 
-		if(r.Method!=http.MethodPost){
+		if r.Method != http.MethodPost {
 			http.Error(w, "Invalid request method", http.StatusBadRequest)
 		}
 
-		var data struct{
+		var data struct {
 			GameName string
-			Email string
-			Price int
+			Email    string
+			Price    int
 		}
-		err:=json.NewDecoder(r.Body).Decode(&data)
-		if(err!=nil){
+		err := json.NewDecoder(r.Body).Decode(&data)
+		if err != nil {
 			http.Error(w, "cant decode", http.StatusBadRequest)
 		}
 		//get money of user
-		row:=db.QueryRow("SELECT Coins FROM UserGamesInfo WHERE Email=?", data.Email)
+		row := db.QueryRow("SELECT Coins FROM UserGamesInfo WHERE Email=?", data.Email)
 		var moneyOfUser int
 		row.Scan(&moneyOfUser)
-		
-		if(moneyOfUser>=data.Price){
-			query:=fmt.Sprintf("UPDATE UserGamesInfo SET Coins=?, %v_Unlocked=1 WHERE Email=? AND %v_Unlocked=0", data.GameName, data.GameName)
+
+		if moneyOfUser >= data.Price {
+			query := fmt.Sprintf("UPDATE UserGamesInfo SET Coins=?, %v_Unlocked=1 WHERE Email=? AND %v_Unlocked=0", data.GameName, data.GameName)
 			db.QueryRow(query, moneyOfUser-data.Price, data.Email)
-		}else{
+		} else {
 			http.Error(w, "Not enough money", http.StatusBadRequest)
 		}
 	}
 }
 
-func HasGame(db *sql.DB) func(w http.ResponseWriter, r *http.Request){
-	return func(w http.ResponseWriter, r *http.Request){
-		if(r.Method!=http.MethodPost){
+func HasGame(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
 			http.Error(w, "Invalid request method", http.StatusBadRequest)
 		}
-		var data struct{
-			GameName string `json:"GameName"`
+		var data struct {
+			GameName  string `json:"GameName"`
 			UserEmail string `json:"UserEmail"`
 		}
 		json.NewDecoder(r.Body).Decode(&data)
 		fmt.Print(data)
 		var res int
-		query:=fmt.Sprintf("SELECT %v_Unlocked FROM UserGamesInfo WHERE Email = ?", data.GameName)
-		row:=db.QueryRow(query, data.UserEmail)
+		query := fmt.Sprintf("SELECT %v_Unlocked FROM UserGamesInfo WHERE Email = ?", data.GameName)
+		row := db.QueryRow(query, data.UserEmail)
 		row.Scan(&res)
 		fmt.Print(res)
 		json.NewEncoder(w).Encode(res)
+	}
+}
+
+func GetCoinsHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Invalid request method", http.StatusBadRequest)
+		}
+
+		email := r.PathValue("userEmail")
+
+		if email == "" {
+			http.Error(w, "Email parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		query := "SELECT Coins FROM userdata.usergamesinfo WHERE Email = ?"
+
+		var coins int
+		err := db.QueryRow(query, email).Scan(&coins)
+		if err != nil {
+			// Handle errors, such as no rows found
+			if err == sql.ErrNoRows {
+				http.Error(w, "User not found", http.StatusNotFound)
+			} else {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		response := struct {
+			Coins int `json:"coins"`
+		}{
+			Coins: coins,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
 	}
 }

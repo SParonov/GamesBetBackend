@@ -31,7 +31,7 @@ func main() {
 	http.HandleFunc("/getChatHistory", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.GetChatHistoryHandler(db)))
 	http.HandleFunc("/saveMessToChatHistory", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.SaveMessToChatHistoryHandler(db)))
 	http.HandleFunc("/updateCoins", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.UpdateCoinsHandler(db)))
-	// http.HandleFunc("/getCoins/{userEmail}", ...) (will be used in every game to show all coins of the user)
+	http.HandleFunc("/getCoins/{userEmail}", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.GetCoinsHandler(db)))
 	http.HandleFunc("/getFriends/{userEmail}", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.GetFriendsHandler(db)))
 	http.HandleFunc("/getPotentialNewFriends/{userEmail}", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.PotentialNewFriendsHandler(db)))
 	http.HandleFunc("/getFriendInvites/{userEmail}", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.GetFriendInvitesHandler(db)))
