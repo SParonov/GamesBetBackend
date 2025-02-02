@@ -40,6 +40,9 @@ func main() {
 	http.HandleFunc("/addToScheduler", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.ScheduleGameHandler(db)))
 	http.HandleFunc("/getAllScheduledGames/{userEmail}", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.GetScheduledGamesHandler(db))) //gets all of the scheduled games of a user, that haven't expired (startDate + 1(tommorow day) > time.Now()), the expired ones get removed
 	http.HandleFunc("/removeFromScheduler/{gameID}", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.RemoveScheduledGameHandler(db)))
+	http.HandleFunc("/handleScoreboard", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.HandleScoreboard(db)))
+	http.HandleFunc("/buyGame", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.HandleBuyGame(db)))
+	http.HandleFunc("/hasGame", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.HasGame(db)))
 	http.HandleFunc("/ws", websocket.WebSocketHandler)
 
 	go websocket.HandleMessages()

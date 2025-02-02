@@ -17,7 +17,7 @@ import (
 	"github.com/sparonov/GamesBetBackend/user"
 	"github.com/sparonov/GamesBetBackend/websocket"
 )
-
+//login/register
 func SignupHandler(db *sql.DB, sessionManager *sessionmanager.SessionManager) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPut {
@@ -245,7 +245,7 @@ func GetUserGameDataHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Requ
 		}
 	}
 }
-
+//chat handlers
 type ChatHistoryResponse struct {
 	ChatHistory []websocket.Message
 }
@@ -323,7 +323,7 @@ func SaveMessToChatHistoryHandler(db *sql.DB) func(w http.ResponseWriter, r *htt
 		w.WriteHeader(http.StatusOK)
 	}
 }
-
+//update coins
 type CoinsQuery struct {
 	Coins int32  `json:"coins"`
 	Email string `json:"email"`
@@ -395,7 +395,7 @@ func UpdateCoinsHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request)
 		w.Header().Set("Content-Type", "application/json")
 	}
 }
-
+//friends handlers
 func PotentialNewFriendsHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -404,7 +404,7 @@ func PotentialNewFriendsHandler(db *sql.DB) func(w http.ResponseWriter, r *http.
 		}
 
 		userEmail := r.PathValue("userEmail")
-
+		//fmt.Print(userEmail)
 		query := `
 			SELECT Email
 			FROM UserRegisterInfo
@@ -430,6 +430,10 @@ func PotentialNewFriendsHandler(db *sql.DB) func(w http.ResponseWriter, r *http.
 			}
 			potentialFriends = append(potentialFriends, email)
 		}
+		// for x:=range(potentialFriends) {
+		// 	fmt.Print(x);
+		// 	fmt.Print((" "))
+		// }
 
 		if err := rows.Err(); err != nil {
 			http.Error(w, "Error iterating over rows: "+err.Error(), http.StatusInternalServerError)
@@ -692,7 +696,7 @@ func CompleteInviteHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Reque
 		w.WriteHeader(http.StatusOK)
 	}
 }
-
+//scheduler handlers
 type ScheduleGameRequest struct {
 	Player1   string `json:"player1"`
 	Player2   string `json:"player2"`
@@ -839,5 +843,113 @@ func RemoveScheduledGameHandler(db *sql.DB) func(w http.ResponseWriter, r *http.
 		}
 
 		w.WriteHeader(http.StatusOK)
+	}
+}
+
+type ScoreboardRow struct{
+	Email string `json: "email"`
+	Coins int	 `json: "coins"`
+}
+
+func HandleScoreboard(db *sql.DB) func(w http.ResponseWriter, r *http.Request){
+	return func(w http.ResponseWriter, r *http.Request){
+
+		if(r.Method!=http.MethodGet){
+			http.Error(w, "Invalid request method", http.StatusBadRequest)
+		}
+
+		rows, err := db.Query("SELECT Email, Coins FROM UserGamesInfo")
+		if err != nil {
+			fmt.Print(err)
+		}
+		defer rows.Close()
+
+		var res []ScoreboardRow
+
+		for rows.Next() {
+			var temp ScoreboardRow
+			if err := rows.Scan(&temp.Email, &temp.Coins); err != nil {
+				fmt.Print(err)
+			}
+			res = append(res, temp)
+		}
+		if err = rows.Err(); err != nil {
+			fmt.Print(err)
+		}
+		
+		//sort res in descending order
+		for i:=0;i<len(res);i++{
+			for j:=i;j<len(res);j++{
+				if(res[i].Coins<res[j].Coins){
+					temp:=res[i]
+					res[i]=res[j]
+					res[j]=temp
+				}
+			}
+		}
+		
+		fmt.Print(res)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+
+		// json.Marshal(struct {
+		// 	scoreboard ScoreboardRow[] 
+		//  }{})
+		if err := json.NewEncoder(w).Encode(struct {
+			Scoreboard []ScoreboardRow `json:"scoreboard"`
+		}{Scoreboard: res}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
+	}
+}
+
+func HandleBuyGame(db *sql.DB) func(w http.ResponseWriter, r *http.Request){
+	return func(w http.ResponseWriter, r *http.Request){
+
+		if(r.Method!=http.MethodPost){
+			http.Error(w, "Invalid request method", http.StatusBadRequest)
+		}
+
+		var data struct{
+			GameName string
+			Email string
+			Price int
+		}
+		err:=json.NewDecoder(r.Body).Decode(&data)
+		if(err!=nil){
+			http.Error(w, "cant decode", http.StatusBadRequest)
+		}
+		//get money of user
+		row:=db.QueryRow("SELECT Coins FROM UserGamesInfo WHERE Email=?", data.Email)
+		var moneyOfUser int
+		row.Scan(&moneyOfUser)
+		
+		if(moneyOfUser>=data.Price){
+			query:=fmt.Sprintf("UPDATE UserGamesInfo SET Coins=?, %v_Unlocked=1 WHERE Email=? AND %v_Unlocked=0", data.GameName, data.GameName)
+			db.QueryRow(query, moneyOfUser-data.Price, data.Email)
+		}else{
+			http.Error(w, "Not enough money", http.StatusBadRequest)
+		}
+	}
+}
+
+func HasGame(db *sql.DB) func(w http.ResponseWriter, r *http.Request){
+	return func(w http.ResponseWriter, r *http.Request){
+		if(r.Method!=http.MethodPost){
+			http.Error(w, "Invalid request method", http.StatusBadRequest)
+		}
+		var data struct{
+			GameName string `json:"GameName"`
+			UserEmail string `json:"UserEmail"`
+		}
+		json.NewDecoder(r.Body).Decode(&data)
+		fmt.Print(data)
+		var res int
+		query:=fmt.Sprintf("SELECT %v_Unlocked FROM UserGamesInfo WHERE Email = ?", data.GameName)
+		row:=db.QueryRow(query, data.UserEmail)
+		row.Scan(&res)
+		fmt.Print(res)
+		json.NewEncoder(w).Encode(res)
 	}
 }
