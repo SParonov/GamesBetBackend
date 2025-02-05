@@ -67,8 +67,8 @@ func SignupHandler(db *sql.DB, sessionManager *sessionmanager.SessionManager) fu
 			return
 		}
 
-		query = "INSERT INTO UserGamesInfo (Email, Coins, Game1_Unlocked, Game1_Highscore, Game2_Unlocked, Game2_Highscore, Game3_Unlocked, Game3_Highscore, Game4_Unlocked, Game4_Highscore, Game5_Unlocked, Game5_Highscore, Game6_Unlocked, Game6_Highscore, Game7_Unlocked, Game7_Highscore, Game8_Unlocked, Game8_Highscore) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-		err = db.QueryRow(query, user.Email, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0).Err()
+		query = "INSERT INTO UserGamesInfo (Email, Coins, Game1_Unlocked, Game1_Highscore, Game2_Unlocked, Game2_Highscore, Game3_Unlocked, Game3_Highscore, Game4_Unlocked, Game4_Highscore, Game5_Unlocked, Game5_Highscore, Game6_Unlocked, Game6_Highscore, Badge1_Unlocked, Badge2_Unlocked, Badge3_Unlocked) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+		err = db.QueryRow(query, user.Email, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0).Err()
 
 		if err != nil {
 			fmt.Print(err)
@@ -999,4 +999,55 @@ func GetCoinsHandler(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		}
 	}
+}
+
+func HandleBuyBadge(db *sql.DB) func(w http.ResponseWriter, r *http.Request){
+    return func(w http.ResponseWriter, r *http.Request){
+        if(r.Method!=http.MethodPost){
+            http.Error(w, "Invalid request method", http.StatusBadRequest)
+        }
+
+        var data struct{
+            BadgeName string
+            UserEmail string
+            Price int
+        }
+
+        err:=json.NewDecoder(r.Body).Decode(&data)
+        if(err!=nil){
+            http.Error(w, "cant decode", http.StatusBadRequest)
+        }
+
+        row:=db.QueryRow("SELECT Coins FROM UserGamesInfo WHERE Email=?", data.UserEmail)
+        var moneyOfUser int
+        row.Scan(&moneyOfUser)
+
+        if(moneyOfUser>=data.Price){
+            query:=fmt.Sprintf("UPDATE UserGamesInfo SET Coins=?, %v_Unlocked=1 WHERE Email=? AND %v_Unlocked=0", data.BadgeName, data.BadgeName)
+            db.QueryRow(query, moneyOfUser-data.Price, data.UserEmail)
+        }else{
+            http.Error(w, "Not enough money", http.StatusBadRequest)
+        }
+
+    }
+}
+
+func HasBadge(db *sql.DB) func(w http.ResponseWriter, r *http.Request){
+    return func(w http.ResponseWriter, r *http.Request){
+        if(r.Method!=http.MethodPost){
+            http.Error(w, "Invalid request method", http.StatusBadRequest)
+        }
+        var data struct{
+            BadgeName string `json:"BadgeName"`
+            UserEmail string `json:"UserEmail"`
+        }
+        json.NewDecoder(r.Body).Decode(&data)
+        //fmt.Print(data)
+        var res int
+        query:=fmt.Sprintf("SELECT %v_Unlocked FROM UserGamesInfo WHERE Email = ?", data.BadgeName)
+        row:=db.QueryRow(query, data.UserEmail)
+        row.Scan(&res)
+        //fmt.Print(res)
+        json.NewEncoder(w).Encode(res)
+    }
 }

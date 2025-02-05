@@ -43,6 +43,8 @@ func main() {
 	http.HandleFunc("/handleScoreboard", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.HandleScoreboard(db)))
 	http.HandleFunc("/buyGame", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.HandleBuyGame(db)))
 	http.HandleFunc("/hasGame", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.HasGame(db)))
+	http.HandleFunc("/buyBadge", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.HandleBuyBadge(db)))
+	http.HandleFunc("/hasBadge", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.HasBadge(db)))
 	http.HandleFunc("/ws", websocket.WebSocketHandler)
 
 	go websocket.HandleMessages()
