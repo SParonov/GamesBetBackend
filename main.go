@@ -13,6 +13,7 @@ import (
 	"github.com/sparonov/GamesBetBackend/handlers"
 	"github.com/sparonov/GamesBetBackend/sessionmanager"
 	"github.com/sparonov/GamesBetBackend/websocket"
+	"github.com/sparonov/GamesBetBackend/activities"
 )
 
 func main() {
@@ -21,6 +22,8 @@ func main() {
 	db := database.Connect()
 
 	sessionManager := sessionmanager.New(db, time.Minute*time.Duration(10))
+
+	go activities.AddActivityForEveryUser(db)
 
 	http.HandleFunc("/signup", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.SignupHandler(db, sessionManager)))
 	http.HandleFunc("/login", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.LoginHandler(db, sessionManager)))
@@ -45,6 +48,8 @@ func main() {
 	http.HandleFunc("/hasGame", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.HasGame(db)))
 	http.HandleFunc("/buyBadge", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.HandleBuyBadge(db)))
 	http.HandleFunc("/hasBadge", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.HasBadge(db)))
+	http.HandleFunc("/getActivities", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.GetActivities(db)))
+	http.HandleFunc("/removeActivity", cors.CORSMiddleware(config.CORSAllowedOrigins, handlers.RemoveActivity(db)))
 	http.HandleFunc("/ws", websocket.WebSocketHandler)
 
 	go websocket.HandleMessages()

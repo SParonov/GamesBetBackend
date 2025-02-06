@@ -893,7 +893,6 @@ func HandleScoreboard(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		fmt.Print(res)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -949,12 +948,10 @@ func HasGame(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
 			UserEmail string `json:"UserEmail"`
 		}
 		json.NewDecoder(r.Body).Decode(&data)
-		fmt.Print(data)
 		var res int
 		query := fmt.Sprintf("SELECT %v_Unlocked FROM UserGamesInfo WHERE Email = ?", data.GameName)
 		row := db.QueryRow(query, data.UserEmail)
 		row.Scan(&res)
-		fmt.Print(res)
 		json.NewEncoder(w).Encode(res)
 	}
 }
@@ -1042,12 +1039,66 @@ func HasBadge(db *sql.DB) func(w http.ResponseWriter, r *http.Request){
             UserEmail string `json:"UserEmail"`
         }
         json.NewDecoder(r.Body).Decode(&data)
-        //fmt.Print(data)
         var res int
         query:=fmt.Sprintf("SELECT %v_Unlocked FROM UserGamesInfo WHERE Email = ?", data.BadgeName)
         row:=db.QueryRow(query, data.UserEmail)
         row.Scan(&res)
-        //fmt.Print(res)
         json.NewEncoder(w).Encode(res)
     }
+}
+
+func GetActivities(db *sql.DB) func(w http.ResponseWriter, r *http.Request){
+	return func(w http.ResponseWriter, r *http.Request){
+		if(r.Method!=http.MethodPost){
+			http.Error(w, "invalid request method", http.StatusBadRequest)
+		}
+
+		var email struct{Email string}
+
+		json.NewDecoder(r.Body).Decode(&email)
+
+		
+		var activities []struct{
+			RequiredCoins int 	`json:"RequiredCoins"`
+			Game string			`json:"Game"`
+			Reward int			`json:"Reward"`
+		}
+
+		rows, _:=db.Query("SELECT RequiredCoins, Game, Reward FROM Activities WHERE Email=?", email.Email)
+		for rows.Next(){
+			var temp struct{
+				RequiredCoins int 	`json:"RequiredCoins"`
+				Game string			`json:"Game"`
+				Reward int			`json:"Reward"`
+			}
+			rows.Scan(&temp.RequiredCoins, &temp.Game, &temp.Reward)
+			activities=append(activities, temp)
+		}
+		json.NewEncoder(w).Encode(&activities)
+	}
+}
+
+func RemoveActivity(db *sql.DB) func(w http.ResponseWriter, r *http.Request){
+	return func (w http.ResponseWriter, r *http.Request){
+		if(r.Method!=http.MethodPost){
+			http.Error(w, "Invalid request method", http.StatusBadRequest)
+		}
+
+		var temp struct{
+			Email string  		`json:"Email"`
+			RequiredCoins int 	`json:"RequiredCoins"`
+			Game string			`json:"Game"`
+			Reward int			`json:"Reward"`
+
+		}
+
+		json.NewDecoder(r.Body).Decode(&temp)
+		row:=db.QueryRow("SELECT Coins FROM UserGamesInfo WHERE Email=?", temp.Email)
+		var coins int
+		row.Scan(&coins)
+		db.Exec("UPDATE UserGamesInfo SET Coins=? WHERE Email=?",coins+temp.Reward, temp.Email)
+		db.Query("DELETE FROM Activities WHERE Email=? AND RequiredCoins=? AND Game=? AND Reward=?",temp.Email, temp.RequiredCoins, temp.Game, temp.Reward)
+
+
+	}
 }
