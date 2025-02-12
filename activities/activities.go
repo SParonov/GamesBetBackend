@@ -79,6 +79,6 @@ func AddActivityForEveryUser(db *sql.DB){
 		go AddActivityForAGivenUser(db, temp)
 	}
 
-	time.Sleep(24*time.Hour)
+	time.Sleep(1*time.Minute)
 	AddActivityForEveryUser(db)
 }

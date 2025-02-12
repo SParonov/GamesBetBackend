@@ -67,8 +67,8 @@ func SignupHandler(db *sql.DB, sessionManager *sessionmanager.SessionManager) fu
 			return
 		}
 
-		query = "INSERT INTO UserGamesInfo (Email, Coins, Game1_Unlocked, Game1_Highscore, Game2_Unlocked, Game2_Highscore, Game3_Unlocked, Game3_Highscore, Game4_Unlocked, Game4_Highscore, Game5_Unlocked, Game5_Highscore, Game6_Unlocked, Game6_Highscore, Badge1_Unlocked, Badge2_Unlocked, Badge3_Unlocked) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-		err = db.QueryRow(query, user.Email, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0).Err()
+		query = "INSERT INTO UserGamesInfo (Email, Coins, Game1_Unlocked, Game1_Highscore, Game2_Unlocked, Game2_Highscore, Game3_Unlocked, Game3_Highscore, Game4_Unlocked, Game4_Highscore, Game5_Unlocked, Game5_Highscore, Badge1_Unlocked, Badge2_Unlocked, Badge3_Unlocked) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+		err = db.QueryRow(query, user.Email, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0).Err()
 
 		if err != nil {
 			fmt.Print(err)
